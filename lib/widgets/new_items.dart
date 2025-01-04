@@ -21,10 +21,14 @@ class _NewItemsState extends State<NewItems> {
   var enteredName = '';
   var enteredQuantity = 1;
   var selectedCategory = categories[Categories.vegetables]!;
+  var isSending = false;
 
   void _saveItem() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+      setState(() {
+        isSending = true;
+      });
       final url = Uri.https(
         'groceriesapp-e76b0-default-rtdb.firebaseio.com',
         'shopping-list.json',
@@ -42,14 +46,20 @@ class _NewItemsState extends State<NewItems> {
             },
           ));
 
-      print(response.statusCode);
-      print(response.body);
+      final Map<String, dynamic> resData = json.decode(response.body);
 
       if (!context.mounted) {
         return;
       }
 
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(
+        GroceryItem(
+          id: resData['name'],
+          name: enteredName,
+          quantity: enteredQuantity,
+          category: selectedCategory,
+        ),
+      );
     }
   }
 
@@ -148,18 +158,26 @@ class _NewItemsState extends State<NewItems> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: () {
-                        _formKey.currentState!.reset();
-                      },
+                      onPressed: isSending
+                          ? null
+                          : () {
+                              _formKey.currentState!.reset();
+                            },
                       child: Text(
                         'Reset',
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: _saveItem,
-                      child: Text(
-                        'Add Item',
-                      ),
+                      onPressed: isSending ? null : _saveItem,
+                      child: isSending
+                          ? SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(),
+                            )
+                          : Text(
+                              'Add Item',
+                            ),
                     ),
                   ],
                 )
