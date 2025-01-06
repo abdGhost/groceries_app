@@ -31,35 +31,49 @@ class _GroceryListState extends State<GroceryList> {
       'shopping-list.json',
     );
 
-    final response = await http.get(url);
-    print(response.statusCode);
-    if (response.statusCode >= 400) {
+    try {
+      final response = await http.get(url);
+
+      print(response.statusCode);
+      if (response.statusCode >= 400) {
+        setState(() {
+          error = 'Failed to fetch data...';
+        });
+      }
+
+      if (response.body == 'null') {
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
+
+      final Map<String, dynamic> listData = json.decode(response.body);
+      final List<GroceryItem> loadItems = [];
+      for (final item in listData.entries) {
+        final category = categories.entries
+            .firstWhere(
+                (catItem) => catItem.value.title == item.value['category'])
+            .value;
+
+        loadItems.add(
+          GroceryItem(
+            id: item.key,
+            name: item.value['name'],
+            quantity: item.value['quantity'],
+            category: category,
+          ),
+        );
+      }
       setState(() {
-        error = 'Failed to fetch data...';
+        groceryItems = loadItems;
+        isLoading = false;
+      });
+    } catch (er) {
+      setState(() {
+        error = 'Something went wrong!';
       });
     }
-
-    final Map<String, dynamic> listData = json.decode(response.body);
-    final List<GroceryItem> loadItems = [];
-    for (final item in listData.entries) {
-      final category = categories.entries
-          .firstWhere(
-              (catItem) => catItem.value.title == item.value['category'])
-          .value;
-
-      loadItems.add(
-        GroceryItem(
-          id: item.key,
-          name: item.value['name'],
-          quantity: item.value['quantity'],
-          category: category,
-        ),
-      );
-    }
-    setState(() {
-      groceryItems = loadItems;
-      isLoading = false;
-    });
   }
 
   void _addItem() async {
@@ -76,10 +90,20 @@ class _GroceryListState extends State<GroceryList> {
     });
   }
 
-  void _removeItem(GroceryItem item) {
+  void _removeItem(GroceryItem item) async {
+    final index = groceryItems.indexOf(item);
     setState(() {
       groceryItems.remove(item);
     });
+    final url = Uri.https('groceriesapp-e76b0-default-rtdb.firebaseio.com',
+        'shopping-list/${item.id}.json');
+
+    final response = await http.delete(url);
+    if (response.statusCode >= 400) {
+      setState(() {
+        groceryItems.insert(index, item);
+      });
+    }
   }
 
   @override
